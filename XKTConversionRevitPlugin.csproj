@@ -1,7 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    RevitVersion drives both the target framework and the Revit API reference.
+    - Revit 2025 / 2026 → .NET 8
+    - Revit 2027+        → .NET 10
+    Set this on the command line (-p:RevitVersion=2026) or leave it at the default.
+  -->
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2027</RevitVersion>
+    <TargetFramework Condition="'$(RevitVersion)' == '2027'">net10.0-windows</TargetFramework>
+    <TargetFramework Condition="'$(RevitVersion)' != '2027'">net8.0-windows</TargetFramework>
     <AssemblyName>XKTConversionRevitPlugin</AssemblyName>
     <RootNamespace>XKTConversionRevitPlugin</RootNamespace>
     <Version>1.0.0</Version>
@@ -14,18 +22,6 @@
     <UseWPF>true</UseWPF>
     <!-- Copy NuGet dependency DLLs to the output folder so the staging step can find them -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
-
-  <!--
-    Revit API references.
-    - Local development: uses hint paths (Revit must be installed).
-      Change the year in the paths below to match your installed version.
-    - CI / GitHub Actions: set the MSBuild property RevitVersion (e.g. 2025)
-      and the Nice3point NuGet stubs are used instead — no Revit install needed.
-  -->
-  <PropertyGroup>
-    <!-- Default to 2027 for local builds; overridden by the CI matrix. -->
-    <RevitVersion Condition="'$(RevitVersion)' == ''">2027</RevitVersion>
   </PropertyGroup>
 
   <!-- Local build path (used when Nice3point package is not available) -->

@@ -23,18 +23,26 @@ jobs:
     strategy:
       fail-fast: false   # keep building other years even if one fails
       matrix:
-        revit_year: [2025, 2026, 2027]
+        include:
+          - revit_year: 2025
+            dotnet_tfm: net8.0-windows   # Revit 2025 targets .NET 8
+          - revit_year: 2026
+            dotnet_tfm: net8.0-windows   # Revit 2026 targets .NET 8
+          - revit_year: 2027
+            dotnet_tfm: net10.0-windows  # Revit 2027 targets .NET 10
 
     steps:
       # ── 1. Check out the repository ──────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 2. Install .NET 8 ────────────────────────────────────────────────────
-      - name: Setup .NET 8
+      # ── 2. Install .NET (both 8 and 10 so any matrix leg is covered) ─────────
+      - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       # ── 3. Restore NuGet packages ────────────────────────────────────────────
       - name: Restore packages
@@ -58,7 +66,7 @@ jobs:
       - name: Stage plugin files
         shell: pwsh
         run: |
-          $outDir  = "bin/Release/net8.0-windows"
+          $outDir  = "bin/Release/${{ matrix.dotnet_tfm }}"
           $staging = "staging/XKTPlugin-Revit${{ matrix.revit_year }}"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
 
