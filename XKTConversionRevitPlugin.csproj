@@ -13,16 +13,34 @@
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
-  <!-- Revit API references – adjust path to your Revit install -->
-  <ItemGroup>
+  <!--
+    Revit API references.
+    - Local development: uses hint paths (Revit must be installed).
+      Change the year in the paths below to match your installed version.
+    - CI / GitHub Actions: set the MSBuild property RevitVersion (e.g. 2025)
+      and the Nice3point NuGet stubs are used instead — no Revit install needed.
+  -->
+  <PropertyGroup>
+    <!-- Default to 2027 for local builds; overridden by the CI matrix. -->
+    <RevitVersion Condition="'$(RevitVersion)' == ''">2027</RevitVersion>
+  </PropertyGroup>
+
+  <!-- Local build path (used when Nice3point package is not available) -->
+  <ItemGroup Condition="'$(UseRevitNuGet)' != 'true'">
     <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2027\RevitAPI.dll</HintPath>
+      <HintPath>C:\Program Files\Autodesk\Revit $(RevitVersion)\RevitAPI.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="RevitAPIUI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2027\RevitAPIUI.dll</HintPath>
+      <HintPath>C:\Program Files\Autodesk\Revit $(RevitVersion)\RevitAPIUI.dll</HintPath>
       <Private>false</Private>
     </Reference>
+  </ItemGroup>
+
+  <!-- CI build: Nice3point community NuGet stubs (no Revit install required) -->
+  <ItemGroup Condition="'$(UseRevitNuGet)' == 'true'">
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPI"   Version="$(RevitVersion).*" />
+    <PackageReference Include="Nice3point.Revit.Api.RevitAPIUI" Version="$(RevitVersion).*" />
   </ItemGroup>
 
   <ItemGroup>

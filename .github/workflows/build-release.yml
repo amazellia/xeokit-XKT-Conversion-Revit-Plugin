@@ -1,0 +1,120 @@
+name: Build & Release
+
+# Triggers:
+#   1. Push a version tag  →  git tag v1.2.3 && git push origin v1.2.3
+#   2. GitHub UI           →  Actions tab → "Build & Release" → Run workflow
+on:
+  push:
+    tags:
+      - "v*"          # e.g. v1.0.0, v1.2.3
+  workflow_dispatch:  # manual trigger (no tag required, produces a draft release)
+
+permissions:
+  contents: write   # needed to create releases and upload assets
+
+jobs:
+  build:
+    name: Build for Revit ${{ matrix.revit_year }}
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false   # keep building other years even if one fails
+      matrix:
+        revit_year: [2025, 2026, 2027]
+
+    steps:
+      # ── 1. Check out the repository ──────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Install .NET 8 ────────────────────────────────────────────────────
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # ── 3. Restore NuGet packages ────────────────────────────────────────────
+      - name: Restore packages
+        run: >
+          dotnet restore
+          -p:RevitVersion=${{ matrix.revit_year }}
+          -p:UseRevitNuGet=true
+
+      # ── 4. Build (Release configuration) ────────────────────────────────────
+      - name: Build
+        run: >
+          dotnet build
+          --configuration Release
+          --no-restore
+          -p:RevitVersion=${{ matrix.revit_year }}
+          -p:UseRevitNuGet=true
+
+      # ── 5. Collect output files into a staging folder ────────────────────────
+      - name: Stage plugin files
+        shell: pwsh
+        run: |
+          $outDir  = "bin/Release/net8.0-windows"
+          $staging = "staging/XKTPlugin-Revit${{ matrix.revit_year }}"
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+
+          # Core plugin files
+          Copy-Item "$outDir/XKTConversionRevitPlugin.dll"   $staging
+          Copy-Item "$outDir/XKTConversionRevitPlugin.addin" $staging
+
+          # Runtime dependencies (must ship alongside the DLL)
+          Copy-Item "$outDir/Newtonsoft.Json.dll"            $staging
+          Copy-Item "$outDir/ICSharpCode.SharpZipLib.dll"    $staging
+
+          # Viewer (handy to bundle for new users)
+          New-Item -ItemType Directory -Force -Path "$staging/viewer" | Out-Null
+          Copy-Item "viewer/index.html" "$staging/viewer/"
+
+          Write-Host "Staged files:"
+          Get-ChildItem $staging -Recurse | Select-Object FullName
+
+      # ── 6. Zip the staging folder ────────────────────────────────────────────
+      - name: Create zip
+        shell: pwsh
+        run: |
+          $source = "staging/XKTPlugin-Revit${{ matrix.revit_year }}"
+          $dest   = "XKTPlugin-Revit${{ matrix.revit_year }}.zip"
+          Compress-Archive -Path "$source/*" -DestinationPath $dest -Force
+          Write-Host "Created: $dest  ($([math]::Round((Get-Item $dest).Length/1KB, 1)) KB)"
+
+      # ── 7. Upload zip as a workflow artifact (always available) ──────────────
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: XKTPlugin-Revit${{ matrix.revit_year }}
+          path: XKTPlugin-Revit${{ matrix.revit_year }}.zip
+          if-no-files-found: error
+
+      # ── 8. Attach zip to a GitHub Release ───────────────────────────────────
+      #    - Tag push  → published release
+      #    - Manual    → draft release (lets you review before publishing)
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## xeokit XKT Conversion Plugin for Revit
+
+            ### Installation
+            1. Download the zip for your Revit version below.
+            2. Extract it and copy all files to:
+               `%APPDATA%\Autodesk\Revit\Addins\<your Revit year>\`
+            3. Restart Revit — an **xeokit** tab will appear in the ribbon.
+
+            📖 Full instructions: see the [README](https://github.com/${{ github.repository }}#installation----step-by-step)
+
+            ### Downloads
+            | File | Revit Version |
+            |------|---------------|
+            | `XKTPlugin-Revit2025.zip` | Revit 2025 |
+            | `XKTPlugin-Revit2026.zip` | Revit 2026 |
+            | `XKTPlugin-Revit2027.zip` | Revit 2027 |
+          files: XKTPlugin-Revit${{ matrix.revit_year }}.zip
