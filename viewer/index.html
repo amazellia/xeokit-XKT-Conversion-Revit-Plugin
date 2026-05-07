@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>xeokit XKT Viewer – Revit Export Preview</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a2e; color: #eee; font-family: sans-serif; overflow: hidden; }
+    #canvas { width: 100vw; height: 100vh; }
+    #hud {
+      position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,.65);
+      padding: 10px 14px; border-radius: 6px; font-size: 13px; line-height: 1.7;
+      max-width: 320px;
+    }
+    #hud h2 { font-size: 15px; margin-bottom: 6px; color: #7ecfff; }
+    #drop-zone {
+      position: fixed; inset: 0; display: flex; align-items: center;
+      justify-content: center; flex-direction: column; gap: 12px;
+      background: rgba(0,0,0,.82);
+    }
+    #drop-zone p { font-size: 18px; color: #aee; }
+    #drop-zone small { color: #888; }
+    #drop-zone.hidden { display: none; }
+    #file-btn {
+      padding: 10px 22px; background: #0d7eff; color: #fff; border: none;
+      border-radius: 5px; cursor: pointer; font-size: 14px;
+    }
+    #file-btn:hover { background: #0c6ce0; }
+    #xkt-input, #meta-input { display: none; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <div id="drop-zone">
+    <h1 style="color:#7ecfff;font-size:22px">xeokit XKT Viewer</h1>
+    <p>Load your Revit XKT export</p>
+    <button id="file-btn">Open XKT File…</button>
+    <small>Optionally also load the -metadata.json sidecar for BIM tree</small>
+    <input type="file" id="xkt-input"  accept=".xkt" />
+    <input type="file" id="meta-input" accept=".json" />
+  </div>
+
+  <div id="hud" style="display:none">
+    <h2>Model Info</h2>
+    <div id="hud-body">–</div>
+    <br/>
+    <div style="color:#aaa;font-size:11px">
+      Left-drag: orbit &nbsp;|&nbsp; Right-drag: pan<br/>
+      Scroll: zoom &nbsp;|&nbsp; F: fit view
+    </div>
+  </div>
+
+  <!-- xeokit SDK from CDN -->
+  <script type="module">
+    import { Viewer, XKTLoaderPlugin }
+      from "https://cdn.jsdelivr.net/npm/@xeokit/xeokit-sdk/dist/xeokit-sdk.es.min.js";
+
+    const viewer = new Viewer({
+      canvasId     : "canvas",
+      transparent  : false,
+      backgroundColor: [0.1, 0.1, 0.18]
+    });
+
+    viewer.camera.eye  = [0, 0, 80];
+    viewer.camera.look = [0, 0,  0];
+    viewer.camera.up   = [0, 1,  0];
+
+    const loader = new XKTLoaderPlugin(viewer);
+
+    // Keyboard shortcut: F = fit all
+    window.addEventListener("keydown", e => {
+      if (e.key === "f" || e.key === "F") viewer.cameraFlight.flyTo(viewer.scene);
+    });
+
+    const dropZone  = document.getElementById("drop-zone");
+    const hud       = document.getElementById("hud");
+    const hudBody   = document.getElementById("hud-body");
+    const xktInput  = document.getElementById("xkt-input");
+    const metaInput = document.getElementById("meta-input");
+    const fileBtn   = document.getElementById("file-btn");
+
+    fileBtn.addEventListener("click", () => xktInput.click());
+
+    let xktObjectUrl = null;
+    let metaObjectUrl = null;
+
+    xktInput.addEventListener("change", async () => {
+      const file = xktInput.files[0];
+      if (!file) return;
+
+      if (xktObjectUrl) URL.revokeObjectURL(xktObjectUrl);
+      xktObjectUrl = URL.createObjectURL(file);
+
+      // Prompt for optional metadata
+      metaInput.click();
+      metaInput.onchange = () => {
+        const metaFile = metaInput.files[0];
+        if (metaFile) {
+          if (metaObjectUrl) URL.revokeObjectURL(metaObjectUrl);
+          metaObjectUrl = URL.createObjectURL(metaFile);
+        }
+        loadModel(file.name, xktObjectUrl, metaObjectUrl);
+      };
+    });
+
+    function loadModel(name, xktUrl, metaUrl) {
+      dropZone.classList.add("hidden");
+      hud.style.display = "block";
+      hudBody.textContent = "Loading…";
+
+      viewer.scene.models.forEach(m => m.destroy());
+
+      const opts = { id: "model", src: xktUrl };
+      if (metaUrl) opts.metaModelSrc = metaUrl;
+
+      const model = loader.load(opts);
+
+      model.on("loaded", () => {
+        const s = viewer.scene;
+        viewer.cameraFlight.flyTo(s);
+        const count = Object.keys(s.objects).length;
+        const triCount = Object.values(s.meshes)
+          .reduce((a, m) => a + (m.numTriangles || 0), 0);
+        hudBody.innerHTML =
+          `<b>${name}</b><br/>` +
+          `Objects: ${count.toLocaleString()}<br/>` +
+          `Triangles: ${triCount.toLocaleString()}`;
+      });
+
+      model.on("error", err => {
+        hudBody.textContent = "Error: " + err;
+        console.error(err);
+      });
+    }
+  </script>
+</body>
+</html>

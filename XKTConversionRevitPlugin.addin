@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>XKT Conversion Plugin</Name>
+    <Assembly>XKTConversionRevitPlugin.dll</Assembly>
+    <FullClassName>XKTConversionRevitPlugin.Application</FullClassName>
+    <ClientId>D6A2B3C4-E5F6-7890-ABCD-EF1234567890</ClientId>
+    <VendorId>XKT</VendorId>
+    <VendorDescription>xeokit XKT Conversion Plugin for Revit</VendorDescription>
+  </AddIn>
+</RevitAddIns>
