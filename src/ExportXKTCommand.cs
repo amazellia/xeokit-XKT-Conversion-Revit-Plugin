@@ -3,7 +3,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using System;
 using System.IO;
-using System.Windows.Forms;
+using WinForms = System.Windows.Forms;   // alias to avoid clash with Revit.UI.TaskDialog
 using XKTConversionRevitPlugin.Revit;
 using XKTConversionRevitPlugin.XKT;
 
@@ -19,13 +19,13 @@ namespace XKTConversionRevitPlugin
             var doc   = uidoc.Document;
 
             // Pick output directory
-            using var dlg = new FolderBrowserDialog
+            using var dlg = new WinForms.FolderBrowserDialog
             {
-                Description  = "Select output folder for XKT export",
+                Description         = "Select output folder for XKT export",
                 ShowNewFolderButton = true
             };
 
-            if (dlg.ShowDialog() != DialogResult.OK)
+            if (dlg.ShowDialog() != WinForms.DialogResult.OK)
                 return Result.Cancelled;
 
             var outputDir = dlg.SelectedPath;
