@@ -28,11 +28,11 @@ jobs:
     steps:
       # ── 1. Check out the repository ──────────────────────────────────────────
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       # ── 2. Install .NET 8 ────────────────────────────────────────────────────
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
@@ -42,6 +42,7 @@ jobs:
           dotnet restore
           -p:RevitVersion=${{ matrix.revit_year }}
           -p:UseRevitNuGet=true
+          --verbosity normal
 
       # ── 4. Build (Release configuration) ────────────────────────────────────
       - name: Build
@@ -51,6 +52,7 @@ jobs:
           --no-restore
           -p:RevitVersion=${{ matrix.revit_year }}
           -p:UseRevitNuGet=true
+          --verbosity normal
 
       # ── 5. Collect output files into a staging folder ────────────────────────
       - name: Stage plugin files
@@ -59,6 +61,10 @@ jobs:
           $outDir  = "bin/Release/net8.0-windows"
           $staging = "staging/XKTPlugin-Revit${{ matrix.revit_year }}"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
+
+          # Show everything the build produced (helps diagnose missing files)
+          Write-Host "=== Build output ==="
+          Get-ChildItem $outDir | Select-Object -ExpandProperty Name | Sort-Object
 
           # Core plugin files
           Copy-Item "$outDir/XKTConversionRevitPlugin.dll"   $staging
@@ -72,8 +78,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$staging/viewer" | Out-Null
           Copy-Item "viewer/index.html" "$staging/viewer/"
 
-          Write-Host "Staged files:"
-          Get-ChildItem $staging -Recurse | Select-Object FullName
+          Write-Host "=== Staged files ==="
+          Get-ChildItem $staging -Recurse | Select-Object -ExpandProperty FullName
 
       # ── 6. Zip the staging folder ────────────────────────────────────────────
       - name: Create zip
